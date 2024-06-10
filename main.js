@@ -65,7 +65,7 @@ async function main() {
         res.json(records);
       } catch (error) {
         console.error('Error fetching records:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+        res.status(500).json({ error: error.message });
       }
     });
 
@@ -88,40 +88,45 @@ async function main() {
     })
     // Upload endpoint
     app.post('/upload', upload.single('video'), async (req, res) => {
-      if (!req.file) {
-        return res.status(400).json({ error: 'No file uploaded' });
-      }
-
-      const blob = bucket.file(Date.now() + path.extname(req.file.originalname));
-      const blobStream = blob.createWriteStream({
-        resumable: false,
-        contentType: req.file.mimetype,
-      });
-
-      blobStream.on('error', (err) => {
-        console.error('Blob stream error:', err);
-        res.status(500).json({ error: 'Internal Server Error' });
-      });
-
-      blobStream.on('finish', async () => {
-        try {
-          const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
-
-          // Save file metadata to MongoDB
-          await collection.insertOne({
-            fileName: blob.name,
-            publicUrl: publicUrl,
-            uploadDate: new Date(),
-          });
-
-          res.status(200).json({ fileUrl: publicUrl });
-        } catch (error) {
-          console.error('Error sending response:', error);
-          res.status(500).json({ error: 'Internal Server Error' });
+      try {
+        if (!req.file) {
+          return res.status(400).json({ error: 'No file uploaded' });
         }
-      });
 
-      blobStream.end(req.file.buffer);
+        const blob = bucket.file(Date.now() + path.extname(req.file.originalname));
+        const blobStream = blob.createWriteStream({
+          resumable: false,
+          contentType: req.file.mimetype,
+        });
+
+        blobStream.on('error', (err) => {
+          console.error('Blob stream error:', err);
+          res.status(500).json({ error: 'Internal Server Error' });
+        });
+
+        blobStream.on('finish', async () => {
+          try {
+            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
+
+            // Save file metadata to MongoDB
+            await collection.insertOne({
+              fileName: blob.name,
+              publicUrl: publicUrl,
+              uploadDate: new Date(),
+            });
+
+            res.status(200).json({ fileUrl: publicUrl });
+          } catch (error) {
+            console.error('Error sending response:', error);
+            res.status(500).json({ error: error.message });
+          }
+        });
+
+        blobStream.end(req.file.buffer);
+      } catch (error) {
+        console.error('Error sending response:', error);
+        res.status(500).json({ error: error.message });
+      }
     });
 
     // Start the server
@@ -145,60 +150,3 @@ process.on('SIGINT', async () => {
   }
   process.exit(0);
 });
-
-// const express = require('express');
-// const { MongoClient } = require('mongodb');
-// const cors = require('cors');
-// const dotenv = require('dotenv');
-
-// dotenv.config();
-
-// const app = express();
-// const port = process.env.PORT || 5000;
-
-// app.use(cors());
-// app.use(express.json());
-
-// const uri ='mongodb+srv://harisha2:mongopass@cluster0.a51hsou.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0';
-
-// async function main() {
-//   const client = new MongoClient(uri);
-
-//   try {
-
-//     await client.connect();
-//     console.log('Connected to MongoDB');
-
-
-//     const database = client.db('ad_classification');
-//     const collection = database.collection('analysis_results');
-
-//     await database.listCollections().toArray(function(err, names) {
-//         if(!err) {
-//             console.log(names)
-//         }
-//     });
-
-//     // Fetch all records from the collection
-//     app.get('/records', async (req, res) => {
-//       try {
-//         const records = await collection.find({}).toArray();
-//         res.json(records);
-//       } catch (error) {
-//         console.error('Error fetching records:', error);
-//         res.status(500).json({ error: 'Internal Server Error' });
-//       }
-//     });
-
-//     // Start the server
-//     app.listen(port, () => {
-//       console.log(`Server is running on port: ${port}`);
-//     });
-
-//   } catch (error) {
-//     console.error('Error connecting to MongoDB:', error);
-//     process.exit(1); // Exit process on error
-//   }
-// }
-
-// main().catch(console.error);
