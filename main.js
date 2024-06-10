@@ -18,11 +18,15 @@ app.use(express.json());
 
 const uri = process.env.MONGODB_URI;
 const bucketName = process.env.GCP_BUCKET_NAME;
-const serviceAccountPath = 'gcp_cred.json';
 
-const storage = new Storage({
-  keyFilename: serviceAccountPath,
-});
+// Using service account
+// const serviceAccountPath = 'gcp_cred.json';
+// const storage = new Storage({
+//   keyFilename: serviceAccountPath,
+// });
+
+//using default creds
+const storage = new Storage()
 
 // Create a storage bucket reference
 const bucket = storage.bucket(bucketName);
