@@ -76,7 +76,6 @@ async function main() {
           .bucket(bucketName)
           .file(filename)
           .getSignedUrl({
-            version: 'v4',
             action: 'read',
             expires: Date.now() + 15 * 60 * 1000, // 8 minutes
           });
@@ -106,15 +105,7 @@ async function main() {
 
         blobStream.on('finish', async () => {
           try {
-            const publicUrl = `https://storage.googleapis.com/${bucket.name}/${blob.name}`;
-
-            // Save file metadata to MongoDB
-            await collection.insertOne({
-              fileName: blob.name,
-              publicUrl: publicUrl,
-              uploadDate: new Date(),
-            });
-
+            console.log('Successfully Uploaded..')
             res.status(200).json({ fileUrl: publicUrl });
           } catch (error) {
             console.error('Error sending response:', error);
