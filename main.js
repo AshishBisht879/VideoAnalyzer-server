@@ -20,13 +20,13 @@ const uri = process.env.MONGODB_URI;
 const bucketName = process.env.GCP_BUCKET_NAME;
 
 // Using service account
-// const serviceAccountPath = 'gcp_cred.json';
-// const storage = new Storage({
-//   keyFilename: serviceAccountPath,
-// });
+const serviceAccountPath = 'gcp_cred.json';
+const storage = new Storage({
+  keyFilename: serviceAccountPath,
+});
 
 //using default creds
-const storage = new Storage()
+// const storage = new Storage()
 
 // Create a storage bucket reference
 const bucket = storage.bucket(bucketName);
@@ -72,14 +72,15 @@ async function main() {
     app.get('/getSignedUrl/:filename', async (req, res) => {
       try {
         const filename = req.params.filename;
-        const [url] = await storage
-          .bucket(bucketName)
-          .file(filename)
-          .getSignedUrl({
-            action: 'read',
-            expires: Date.now() + 15 * 60 * 1000, // 8 minutes
-          });
-        res.status(200).json({ filename, signedUrl: url });
+        // const [url] = await bucket
+        //   .file(filename)
+        //   .getSignedUrl({
+        //     action: 'read',
+        //     expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+        //   });
+        // res.status(200).json({ filename, signedUrl: url });
+
+        res.status(200).json({ filename, signedUrl: `https://storage.cloud.google.com/${bucketName}/${filename}` });
       } catch (error) {
         console.error('Error fetching records:', error);
         res.status(500).json({ error: error.message });
@@ -91,8 +92,24 @@ async function main() {
         if (!req.file) {
           return res.status(400).json({ error: 'No file uploaded' });
         }
+        
+        const filename = req.file.originalname
+        let finalFilename = filename;
 
-        const blob = bucket.file(Date.now() + path.extname(req.file.originalname));
+        // Check if the file already exists in the bucket
+        let [exists] = await bucket.file(filename).exists();
+
+        // Add a numeric suffix if the file exists
+        let suffix = 1;
+        while (exists) {
+          let parts = filename.split('.');
+          const extension = parts.pop();
+          finalFilename = `${parts.join('.')}-${suffix}.${extension}`;
+          [exists] = await bucket.file(finalFilename).exists();
+          suffix++;
+        }
+        
+        const blob = bucket.file(finalFilename);
         const blobStream = blob.createWriteStream({
           resumable: false,
           contentType: req.file.mimetype,
@@ -106,7 +123,7 @@ async function main() {
         blobStream.on('finish', async () => {
           try {
             console.log('Successfully Uploaded..')
-            res.status(200).json({ fileUrl: publicUrl });
+            res.status(200).json({filename,success:true});
           } catch (error) {
             console.error('Error sending response:', error);
             res.status(500).json({ error: error.message });
