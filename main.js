@@ -137,6 +137,104 @@ async function main() {
       }
     });
 
+
+    app.post('/export-excel', async (req, res) => {
+      try {
+        const { recordIds = [] } = req.body; // Allow filtering by record IDs (optional)
+        console.log(recordIds)
+        
+        const ids = recordIds.map(id=>new ObjectId(id));
+        const query  = {_id:{$in:ids}
+      }
+        let records;
+    
+        if (recordIds.length > 0) {
+          // Fetch specific records based on IDs
+          records = await collection.find(query).toArray();
+        } else {
+          // Fetch all records (default behavior)
+          records = await collection.find({}).toArray();
+        }
+    
+        if (!records || records.length === 0) {
+          return res.status(404).json({ error: 'No records found' });
+        }
+    
+        // Create a new Excel workbook
+        const workbook = new Workbook();
+        const worksheet = workbook.addWorksheet('Records');
+    
+        // Write headers
+        const headers = Object.keys(records[0]); // Extract headers from the first record
+        worksheet.addRow(headers);
+    
+        // Write data rows
+        records.forEach(record => {
+          worksheet.addRow(Object.values(record));
+        });
+    
+        // Generate Excel file in memory
+        const buffer = await workbook.xlsx.writeBuffer();
+    
+    
+        // Return the Excel file content as a download
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=records.xlsx');
+        res.send(buffer);
+      } catch (error) {
+        console.error('Error generating Excel file:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+    
+    app.post('/export-excel', async (req, res) => {
+      try {
+        const { recordIds = [] } = req.body; // filtering by record IDs
+        
+        const ids = recordIds.map(id=>new ObjectId(id));
+        const query  = {_id:{$in:ids}
+      }
+        let records;
+    
+        if (recordIds.length > 0) {
+          // Fetch specific records based on IDs
+          records = await collection.find(query).toArray();
+        } else {
+          // Fetch all records
+          records = await collection.find({}).toArray();
+        }
+    
+        if (!records || records.length === 0) {
+          return res.status(404).json({ error: 'No records found' });
+        }
+    
+        // Create a new Excel workbook
+        const workbook = new Workbook();
+        const worksheet = workbook.addWorksheet('Records');
+    
+        // Write headers
+        const headers = Object.keys(records[0]); // Extract headers from the first record
+        worksheet.addRow(headers);
+    
+        // Write data rows
+        records.forEach(record => {
+          worksheet.addRow(Object.values(record));
+        });
+    
+        // Generate Excel file in memory
+        const buffer = await workbook.xlsx.writeBuffer();
+    
+    
+        // Return the Excel file content as a download
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=records.xlsx');
+        res.send(buffer);
+      } catch (error) {
+        console.error('Error generating Excel file:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+
     // Start the server
     app.listen(port, () => {
       console.log(`Server is running on port: ${port}`);
