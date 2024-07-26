@@ -1,12 +1,10 @@
 const express = require('express');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const { Storage } = require('@google-cloud/storage');
 const multer = require('multer');
-const path = require('path');
-const fs = require('fs');
-const URL = require('url');
+const {Workbook} = require('exceljs')
 
 dotenv.config();
 
@@ -20,13 +18,13 @@ const uri = process.env.MONGODB_URI;
 const bucketName = process.env.GCP_BUCKET_NAME;
 
 // Using service account
-const serviceAccountPath = 'gcp_cred.json';
-const storage = new Storage({
-  keyFilename: serviceAccountPath,
-});
+//const serviceAccountPath = 'gcp_cred.json';
+//const storage = new Storage({
+ // keyFilename: serviceAccountPath,
+//});
 
 //using default creds
-// const storage = new Storage()
+const storage = new Storage()
 
 // Create a storage bucket reference
 const bucket = storage.bucket(bucketName);
@@ -753,6 +751,104 @@ async function main() {
       } catch (error) {
         console.error('Error sending response:', error);
         res.status(500).json({ error: error.message });
+      }
+    });
+
+
+    app.post('/export-excel', async (req, res) => {
+      try {
+        const { recordIds = [] } = req.body; // Allow filtering by record IDs (optional)
+        console.log(recordIds)
+        
+        const ids = recordIds.map(id=>new ObjectId(id));
+        const query  = {_id:{$in:ids}
+      }
+        let records;
+    
+        if (recordIds.length > 0) {
+          // Fetch specific records based on IDs
+          records = await collection.find(query).toArray();
+        } else {
+          // Fetch all records (default behavior)
+          records = await collection.find({}).toArray();
+        }
+    
+        if (!records || records.length === 0) {
+          return res.status(404).json({ error: 'No records found' });
+        }
+    
+        // Create a new Excel workbook
+        const workbook = new Workbook();
+        const worksheet = workbook.addWorksheet('Records');
+    
+        // Write headers
+        const headers = Object.keys(records[0]); // Extract headers from the first record
+        worksheet.addRow(headers);
+    
+        // Write data rows
+        records.forEach(record => {
+          worksheet.addRow(Object.values(record));
+        });
+    
+        // Generate Excel file in memory
+        const buffer = await workbook.xlsx.writeBuffer();
+    
+    
+        // Return the Excel file content as a download
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=records.xlsx');
+        res.send(buffer);
+      } catch (error) {
+        console.error('Error generating Excel file:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
+      }
+    });
+    
+    app.post('/export-excel', async (req, res) => {
+      try {
+        const { recordIds = [] } = req.body; // filtering by record IDs
+        
+        const ids = recordIds.map(id=>new ObjectId(id));
+        const query  = {_id:{$in:ids}
+      }
+        let records;
+    
+        if (recordIds.length > 0) {
+          // Fetch specific records based on IDs
+          records = await collection.find(query).toArray();
+        } else {
+          // Fetch all records
+          records = await collection.find({}).toArray();
+        }
+    
+        if (!records || records.length === 0) {
+          return res.status(404).json({ error: 'No records found' });
+        }
+    
+        // Create a new Excel workbook
+        const workbook = new Workbook();
+        const worksheet = workbook.addWorksheet('Records');
+    
+        // Write headers
+        const headers = Object.keys(records[0]); // Extract headers from the first record
+        worksheet.addRow(headers);
+    
+        // Write data rows
+        records.forEach(record => {
+          worksheet.addRow(Object.values(record));
+        });
+    
+        // Generate Excel file in memory
+        const buffer = await workbook.xlsx.writeBuffer();
+    
+    
+        // Return the Excel file content as a download
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', 'attachment; filename=records.xlsx');
+        res.send(buffer);
+      } catch (error) {
+        console.error('Error generating Excel file:', error);
+        res.status(500).json({ error: 'Internal Server Error' });
       }
     });
 
