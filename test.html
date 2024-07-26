@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Document</title>
+</head>
+<body>
+  <button id="uploadButton">Upload File</button>
+  <input type="file" id="fileInput" accept="*">
+  <div id="responseMessage"></div>
+
+
+</body>
+<script>
+  async function uploadFileToSignedUrl(file, signedUrl) {
+    try {
+
+      const response = await fetch(signedUrl, {
+        body: file,
+        headers: {
+          'Content-Type': file.type,
+        },
+        method: 'PUT',
+      });
+
+      console.log(response)
+      if (!response.ok) {
+        throw new Error(`Upload failed with status code: ${response.status}`);
+      }
+
+      return 'File uploaded successfully!'; // Return success message
+    } catch (error) {
+      return `Error uploading file: ${error.message}`; // Return error message
+    }
+  }
+
+  async function pickAndUploadFile(signedUrl) {
+    const fileInput = document.getElementById('fileInput');
+    const responseMessage = document.getElementById('responseMessage');
+
+    // Trigger upload on button click (in addition to file change)
+    const uploadButton = document.getElementById('uploadButton');
+    uploadButton.addEventListener('click', async () => {
+      const file = fileInput.files[0];
+      if (!file) {
+        responseMessage.textContent = 'Please select a file to upload.';
+        return;
+      }
+
+      try {
+        const message = await uploadFileToSignedUrl(file, signedUrl);
+        responseMessage.textContent = message;
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        responseMessage.textContent = error.message; // Display error message
+      }
+    });
+
+    // Existing file change listener remains the same
+    /*fileInput.addEventListener('change', async (event) => {
+      const file = event.target.files[0];
+      if (!file) {
+        return; // No file selected
+      }
+
+      try {
+        const message = await uploadFileToSignedUrl(file, signedUrl);
+        responseMessage.textContent = message;
+      } catch (error) {
+        console.error('Error uploading file:', error);
+        responseMessage.textContent = error.message; // Display error message
+      }
+    });
+    */
+  }
+
+  const signedUrl = 'https://storage.googleapis.com/ad_classify_trigger/testFile?X-Goog-Algorithm=GOOG4-RSA-SHA256&X-Goog-Credential=ads-detection%40techenggisgdeliver-1000286105.iam.gserviceaccount.com%2F20240710%2Fauto%2Fstorage%2Fgoog4_request&X-Goog-Date=20240710T113739Z&X-Goog-Expires=900&X-Goog-SignedHeaders=host&X-Goog-Signature=bdcfbd4fd432de44b8c9cae953d16656c5dc8b5edb60c76c4efee15e3591dc455e640cc72716478dce59218a038b8951599505cf89a44335ef9f475daca4a273b95446d7556a3e0f4e202c1af4d1f17a38bbef01eff7b4d74ed3a666a28e17559afb98a326a940df63d654cb16e5baa4b310bd4b6dfd0d1baad630d5741e14de0235d1def729195b9c40fe3315c44d423b352ae2bfe78421dab25e8a27fdacd5ed21905151e0851e232a828da0621e7c3d4962783faef753566f126adec3cf99ae0b30d8cc59f96d2ac8d3d72f3d9d73e693c5bad7d8f794225d02828871db651c5dd9b3e718637365a0fbe5f322da1ba7632fafc610c2c6bc61dad3d4e87a19';
+
+  pickAndUploadFile(signedUrl); // Call the function to initialize listeners
+</script>
+</html>
