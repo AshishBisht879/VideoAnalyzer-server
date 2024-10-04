@@ -18,6 +18,7 @@ const uri = process.env.MONGODB_URI;
 const bucketName = process.env.GCP_BUCKET_NAME;
 const database_name  = process.env.DATABASE_NAME
 const collection_name = process.env.COLLECTION_NAME
+const json_bucket = process.env.GCP_JSON_BUCKET
 
 // Using service account
 const serviceAccountPath = 'gcp_cred.json';
@@ -142,7 +143,7 @@ async function main() {
       //   const fileExtension = filename.split('.').pop().toLowerCase();
       //   return supportedVideoExtensions.includes(fileExtension);
       // }
-
+      
       app.get('/getUploadSignedUrl', async (req, res) => {
         
       
@@ -180,7 +181,7 @@ async function main() {
         const { recordIds = [] } = req.body; // Allow filtering by record IDs (optional)
         console.log(recordIds)
 
-        const ids = recordIds.map(id=>new ObjectId(id));
+        const ids = recordIds.map(id=> ObjectId(id));
         const query  = {_id:{$in:ids}
       }
         let records;
@@ -224,53 +225,46 @@ async function main() {
       }
     });
 
-    app.post('/export-excel', async (req, res) => {
-      try {
-        const { recordIds = [] } = req.body; // filtering by record IDs
 
-        const ids = recordIds.map(id=>new ObjectId(id));
-        const query  = {_id:{$in:ids}
+    app.get('/getViJsonFile',async(req,res) => {
+      try{
+      if(!req.query.filename){
+        return res.status(400).json({ error: 'Missing filename parameter' });
       }
-        let records;
 
-        if (recordIds.length > 0) {
-          // Fetch specific records based on IDs
-          records = await collection.find(query).toArray();
-        } else {
-          // Fetch all records
-          records = await collection.find({}).toArray();
-        }
+      const filename = req.query.filename
 
-        if (!records || records.length === 0) {
-          return res.status(404).json({ error: 'No records found' });
-        }
-
-        // Create a new Excel workbook
-        const workbook = new Workbook();
-        const worksheet = workbook.addWorksheet('Records');
-
-        // Write headers
-        const headers = Object.keys(records[0]); // Extract headers from the first record
-        worksheet.addRow(headers);
-
-        // Write data rows
-        records.forEach(record => {
-          worksheet.addRow(Object.values(record));
-        });
-
-        // Generate Excel file in memory
-        const buffer = await workbook.xlsx.writeBuffer();
-
-
-        // Return the Excel file content as a download
-        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-        res.setHeader('Content-Disposition', 'attachment; filename=records.xlsx');
-        res.send(buffer);
-      } catch (error) {
-        console.error('Error generating Excel file:', error);
-        res.status(500).json({ error: 'Internal Server Error' });
+      if(!filename.toLowerCase().endsWith(".json")){
+        return res.status(400).json({ error: 'Request is Not for JSON File' });
       }
-    });
+      console.log(filename)
+      const bucket = storage.bucket(json_bucket);
+      const file = bucket.file(filename);
+
+      //stream the file content to the response
+      const readStream = file.createReadStream();
+      res.setHeader('Content-Type','application/json');
+
+      //Handle Stream data to pass data to frontend in chunks
+      readStream.on('data',chunk=>{
+        res.write(chunk);
+      })
+
+      readStream.on('end',()=>{
+        res.end();
+      })
+
+      readStream.on('error',err=>{
+        console.error("!!Error while Streaming the JSON file.", err.message);
+        res.status(500).json({message:'Error while reading file.',error:err})
+      })
+    }
+    catch (error) {
+      console.error('API ENDPOINT ERROR:',error.message);
+      res.status(500).json({ message: 'Error fetching file from bucket', error });
+    }
+      
+    })
 
     // Start the server
     app.listen(port, () => {
